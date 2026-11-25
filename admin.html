@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель — Логи в реальном времени</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { font-size: 24px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .status { font-size: 14px; padding: 6px 12px; border-radius: 20px; background: #10b98120; color: #10b981; border: 1px solid #10b98140; }
+        .status.offline { background: #ef444420; color: #ef4444; border-color: #ef444440; }
+        .log-card { background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-left: 4px solid #3b82f6; animation: slideIn 0.3s ease-out; }
+        .log-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #94a3b8; }
+        .log-message { font-size: 15px; font-weight: 500; word-break: break-all; }
+        .log-page { font-size: 12px; color: #64748b; margin-top: 8px; }
+        .empty { text-align: center; color: #64748b; padding: 40px; background: #1e293b; border-radius: 12px; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            Логи в реальном времени
+            <span class="status" id="status">Подключение...</span>
+        </h1>
+        <div id="logsContainer">
+            <div class="empty">Загрузка логов...</div>
+        </div>
+    </div>
+
+    <script>
+        // ВСТАВЬТЕ СЮДА ВАШУ ССЫЛКУ ОТ CLOUDFLARE (без /log в конце)
+        const TUNNEL_URL = "https://bon-contribute-hop-press.trycloudflare.com";                                 
+
+        const logsContainer = document.getElementById('logsContainer');
+        const statusBadge = document.getElementById('status');
+        let lastLogsHash = '';
+
+        async function fetchLogs() {
+            try {
+                const response = await fetch(`${TUNNEL_URL}/get_logs`);
+                if (!response.ok) throw new Error('Network error');
+                
+                const logs = await response.json();
+                
+                // Обновляем статус
+                statusBadge.className = 'status';
+                statusBadge.innerText = 'Онлайн';
+
+                // Проверяем, изменились ли логи, чтобы не перерисовывать зря
+                const currentHash = JSON.stringify(logs);
+                if (currentHash === lastLogsHash) return;
+                lastLogsHash = currentHash;
+
+                if (logs.length === 0) {
+                    logsContainer.innerHTML = '<div class="empty">Пока нет данных. Ждем действий на сайте...</div>';
+                    return;
+                }
+
+                // Отрисовываем логи (сверху самые новые)
+                logsContainer.innerHTML = logs.slice().reverse().map(log => `
+                    <div class="log-card">
+                        <div class="log-header">
+                            <span>${log.time}</span>
+                        </div>
+                        <div class="log-message">${log.message}</div>
+                        ${log.page ? `<div class="log-page">Страница: ${log.page}</div>` : ''}
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                statusBadge.className = 'status offline';
+                statusBadge.innerText = 'Офлайн (сервер спит)';
+            }
+        }
+
+        // Запускаем опрос каждые 2 секунды
+        setInterval(fetchLogs, 2000);
+        fetchLogs();
+    </script>
+</body>
+</html>
